@@ -20,13 +20,10 @@ def learn_parameters_and_tagger_from(data_path):
 	emmission_params = counts/np.repeat(np.sum(counts,axis=1)+1,len(word_pool)).reshape([len(tag_pool),len(word_pool)])
 	#simple POS tagger
 	POS_tag_predictions = np.concatenate([map(lambda a:(list(k for k, v in tag_pool.iteritems() if v == a)), np.argmax(emmission_params,axis=0))],axis=None) 
-	words = sorted(word_pool, key=lambda key: word_pool[key])
-	simple_POS_tagger = dict(zip(words, POS_tag_predictions))
+	simple_POS_tagger = dict(zip(sorted(word_pool, key=lambda key: word_pool[key]), POS_tag_predictions))
 	
 	return emmission_params,simple_POS_tagger
-	
-def train_simple_POS_tagger(emmission_params, word_pool):
 				
 emmission_params, simple_POS_tagger = learn_parameters_from('/Users/linyijuan/desktop/POS_dataset/train')
-print simple_POS_tagger
+
 
