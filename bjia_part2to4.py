@@ -154,7 +154,7 @@ def viterbi(word_sequence, emission_params, transition_params, word_pool_test, t
     return best_path_tag
 
 
-def viterbi_top_nth(word_sequence, emission_params, transition_params, word_pool_test, tag_pool_train, most_common_tag_index, num_of_opt_path=10, require_path_index=10):
+def viterbi_top_nth(word_sequence, emission_params, transition_params, word_pool_test, tag_pool_train, most_common_tag_index, num_of_opt_path=10, require_path_index=5):
     PI = np.zeros((len(word_sequence)+1, len(tag_pool_train)+1, num_of_opt_path))
     paths = np.zeros((len(word_sequence)+1, len(tag_pool_train)+1, num_of_opt_path, 2))
     paths[:,:,:,:] = most_common_tag_index
@@ -163,6 +163,17 @@ def viterbi_top_nth(word_sequence, emission_params, transition_params, word_pool
         for v in range(1, len(tag_pool_train)-1):
             if k == 1:
                 PI[k,v] = transition_params[0,v] * emission_params[v, word_pool_test[word_sequence[k-1].lower()]]
+            elif k == 2:
+                for u in range(1, len(tag_pool_train)-1):
+                    tmp_PI = PI[k-1, u, 0] * transition_params[u,v] * emission_params[v, word_pool_test[word_sequence[k-1].lower()]]
+                    for m in range(num_of_opt_path):
+                        if tmp_PI > PI[k,v,m]:
+                            for d in range(0, num_of_opt_path-m-1):
+                                PI[k,v,num_of_opt_path-d-1] = PI[k,v,num_of_opt_path-d-2]
+                                paths[k,v,num_of_opt_path-d-1] = paths[k,v,num_of_opt_path-d-2]
+                            PI[k,v,m] = tmp_PI
+                            paths[k,v,m] = (u,0)
+                            break
             else:
                 for u in range(1, len(tag_pool_train)-1):
                     for n in range(num_of_opt_path):
@@ -174,6 +185,7 @@ def viterbi_top_nth(word_sequence, emission_params, transition_params, word_pool
                                     paths[k, v, num_of_opt_path-d-1] = paths[k, v, num_of_opt_path-d-2]
                                 PI[k, v, m] = tmp_PI
                                 paths[k, v, m] = (u, n)
+                                break
 
     max_PI = np.zeros((num_of_opt_path))
     max_path_index = np.zeros((num_of_opt_path, 2))
@@ -187,6 +199,7 @@ def viterbi_top_nth(word_sequence, emission_params, transition_params, word_pool
                         max_path_index[num_of_opt_path-d-1] = max_path_index[num_of_opt_path-d-2]
                     max_PI[m] = tmp_PI
                     max_path_index[m] = (v, n)
+                    break
 
     best_path = [max_path_index[require_path_index-1,0]]
     prev_node = max_path_index[require_path_index-1, 0]
@@ -211,34 +224,60 @@ def calAccuracyInViterbi(train_filepath, test_filepath, accuracy_filepath, viter
     emission_params, transition_params, word_pool_test, tag_pool_train, most_common_tag_index = cal_params(train_filepath, test_filepath)
     
     word_sequence = []
+    word_sequence_pool = {}
+    countcount = 1
+    word_sequence = []
+    for line in open(test_filepath, 'r'):
+        perline = line.strip().split(' ')
+        if perline[0] != '':
+            word_sequence.append(perline[0])
+        else:
+            word_sequence_pool[countcount] = word_sequence
+            countcount += 1
+            word_sequence = []
+
+
     # compute the accuracy
     file_out = open('./dev.p3.out','w')
     file_comp = open(accuracy_filepath,'r')
     correct = 0
     wrong = 0
     count = 0
-    for line in open(test_filepath,'r'):
-        perline = line.strip().split(' ')
-        if perline[0] != '':
-            word_sequence.append(perline[0])
-        else:
-            best_path_tag = viterbifunction(word_sequence, emission_params, transition_params, word_pool_test, tag_pool_train, most_common_tag_index)
-            count += 1
-            # print 'No. %d sentence.' %count
-            for i in range(len(word_sequence)):
-                tag = file_comp.readline().strip().split(' ')
-                file_out.write(word_sequence[i] + ' ' + best_path_tag[i] + '\n')
-                if tag[1] == best_path_tag[i]:
-                    correct += 1
-                else:
-                    wrong += 1
-            file_out.write('\n')
-            file_comp.readline()
-            word_sequence = []
+    for sentence in word_sequence_pool.values():
+        best_path_tag = viterbifunction(sentence, emission_params, transition_params, word_pool_test, tag_pool_train, most_common_tag_index)
+        count += 1
+        print 'No. %d sentence.' %count
+        for i in range(len(sentence)):
+            tag = file_comp.readline().strip().split(' ')
+            file_out.write(sentence[i] + ' ' + best_path_tag[i] + '\n')
+            if tag[1] == best_path_tag[i]:
+                correct += 1
+            else:
+                wrong += 1
+        file_out.write('\n')
+        file_comp.readline()
+
+    # for line in open(test_filepath,'r'):
+    #     perline = line.strip().split(' ')
+    #     if perline[0] != '':
+    #         word_sequence.append(perline[0])
+    #     else:
+    #         best_path_tag = viterbifunction(word_sequence, emission_params, transition_params, word_pool_test, tag_pool_train, most_common_tag_index)
+    #         count += 1
+    #         print 'No. %d sentence.' %count
+    #         for i in range(len(word_sequence)):
+    #             tag = file_comp.readline().strip().split(' ')
+    #             file_out.write(word_sequence[i] + ' ' + best_path_tag[i] + '\n')
+    #             if tag[1] == best_path_tag[i]:
+    #                 correct += 1
+    #             else:
+    #                 wrong += 1
+    #         file_out.write('\n')
+    #         file_comp.readline()
+    #         word_sequence = []
 
     return (float(correct)/(correct+wrong))
 
-            
 if __name__ == '__main__':
     POS_trainingpath = './POS_dataset/train'
     POS_testingpath = './POS_dataset/dev.in'
@@ -257,5 +296,4 @@ if __name__ == '__main__':
     # print 'The accuracy of viterbi for dataset dev.in in NPC is: ', calAccuracyInViterbi(NPC_trainingpath, NPC_testingpath, NPC_accuracypath)
 
     # Testing Viterbi for 10th sequence
-    # print 'The accuracy of 10-th viterbi for dataset dev.in in POS is: ', calAccuracyInViterbi(POS_trainingpath, POS_testingpath, POS_accuracypath, viterbi_top_nth)
-    print 'The accuracy of 10-th viterbi for dataset dev.in in NPC is: ', calAccuracyInViterbi(NPC_trainingpath, NPC_testingpath, NPC_accuracypath, viterbi_top_nth)
+    print 'The accuracy of 10-th viterbi for dataset dev.in in POS is: ', calAccuracyInViterbi(POS_trainingpath, POS_testingpath, POS_accuracypath, viterbi_top_nth)
